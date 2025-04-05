@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Green Energy Coin (GEC) | Liquidity Contribution</title>
+    <script src="https://unpkg.com/@solana/web3.js@1.73.2/lib/index.iife.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #28a745;
+            --secondary-color: #007bff;
+            --danger-color: #dc3545;
+            --background-color: #f4fdf7;
+            --text-color: #1b1b1b;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+        }
+
+        .connect-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        h1 { text-align: center; margin: 20px 0; font-size: 1.8em; }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            opacity: 0.95;
+        }
+
+        #wallet-button { background-color: var(--primary-color); color: white; }
+        #disconnect-button { background-color: var(--danger-color); color: white; }
+        #contribute-button { background-color: var(--secondary-color); color: white; }
+
+        .info-box {
+            max-width: 800px;
+            background: white;
+            padding: 30px;
+            margin-top: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+
+        .info-box ul { margin-top: 10px; padding-left: 20px; }
+        .info-box li { margin-bottom: 8px; }
+
+        #countdown, #token-price, #total-contributed, #admin-wallet, #wallet-address-display {
+            font-weight: bold;
+        }
+
+        #admin-wallet:hover {
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        @media (max-width: 600px) {
+            .info-box { padding: 20px; }
+            button { width: 100%; margin: 10px 0; }
+            header { flex-direction: column; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Support the Future of Clean Energy</h1>
+        <div class="connect-buttons">
+            <span id="wallet-address-display" style="font-size: 14px;"></span>
+            <button id="wallet-button">Connect Wallet</button>
+            <button id="disconnect-button" style="display:none;">Disconnect</button>
+        </div>
+    </header>
+
+    <div id="contribute-section" style="display:none;">
+        <button id="contribute-button">Contribute $10 in SOL</button>
+    </div>
+
+    <div class="info-box">
+        <h2>Green Energy Coin (GEC)</h2>
+        <p><strong>GEC</strong> is a Solana-based token created to promote and fund renewable energy initiatives. By contributing to GEC, you're joining a movement to empower global clean energy infrastructure through decentralized finance.</p>
+
+        <h3>Why Provide Liquidity?</h3>
+        <ul>
+            <li>Support global clean and renewable energy projects.</li>
+            <li>Be part of the early liquidity formation of GEC token.</li>
+            <li>Wallets that contribute $10 in SOL will be added to a <strong>Waitlist</strong>.</li>
+            <li>Each waitlisted address will receive <strong>200 GEC tokens</strong> upon listing.</li>
+            <li>Total Supply of GEC: <strong>100,000,000</strong> tokens.</li>
+            <li>Token value = Total USD liquidity / 100,000,000</li>
+        </ul>
+    </div>
+
+    <div class="info-box">
+        <h3>Contribution Stats</h3>
+        <p>Total Contributed: <span id="total-contributed">0</span> SOL</p>
+        <p>Waitlist: <span id="waitlist-count">0</span> contributors</p>
+        <p>Admin Wallet: <span id="admin-wallet">YourAdminWalletAddress</span></p>
+        <p id="countdown"></p>
+        <p>Estimated GEC Token Price: <span id="token-price">$0.00000000</span></p>
+    </div>
+
+    <script>
+        const adminWallet = "YourAdminWalletAddress";
+        let totalContributed = parseFloat(localStorage.getItem("totalContributed")) || 0;
+        let walletAddress = localStorage.getItem("wallet");
+        let canContribute = true;
+        let contributors = JSON.parse(localStorage.getItem("contributors") || "[]");
+
+        async function getSOLPriceUSD() {
+            try {
+                const response = await fetch('https://corsproxy.io/?https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+                const data = await response.json();
+                return data.solana.usd;
+            } catch (e) {
+                console.error(e);
+                alert("Failed to fetch SOL price. Please check your internet connection.");
+                return 0;
+            }
+        }
+
+        async function connectWallet() {
+            try {
+                if (!window.solana || !window.solana.isPhantom) {
+                    throw new Error("Phantom Wallet not detected. Please install it from https://phantom.app/");
+                }
+
+                const response = await window.solana.connect();
+                walletAddress = response.publicKey.toString();
+                localStorage.setItem("wallet", walletAddress);
+                document.getElementById("wallet-button").style.display = "none";
+                document.getElementById("disconnect-button").style.display = "block";
+                document.getElementById("wallet-address-display").innerText = walletAddress;
+                document.getElementById("contribute-section").style.display = "block";
+            } catch (err) {
+                console.error("Wallet connection error:", err);
+                alert(err.message || "Failed to connect to wallet.");
+            }
+        }
+
+        function disconnectWallet() {
+            localStorage.removeItem("wallet");
+            walletAddress = null;
+            document.getElementById("wallet-address-display").innerText = "";
+            document.getElementById("wallet-button").style.display = "block";
+            document.getElementById("disconnect-button").style.display = "none";
+            document.getElementById("contribute-section").style.display = "none";
+        }
+
+        async function contribute() {
+            if (!walletAddress) return alert("Please connect your wallet first.");
+            if (!canContribute) return alert("Contribution window has closed.");
+            if (contributors.includes(walletAddress)) return alert("You have already contributed.");
+
+            try {
+                const solPrice = await getSOLPriceUSD();
+                if (solPrice === 0) return;
+                const solAmount = 10 / solPrice;
+
+                const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'));
+                const fromPubkey = new solanaWeb3.PublicKey(walletAddress);
+                const toPubkey = new solanaWeb3.PublicKey(adminWallet);
+
+                const transaction = new solanaWeb3.Transaction().add(
+                    solanaWeb3.SystemProgram.transfer({
+                        fromPubkey,
+                        toPubkey,
+                        lamports: Math.round(solAmount * solanaWeb3.LAMPORTS_PER_SOL),
+                    })
+                );
+                transaction.feePayer = fromPubkey;
+                transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+                const signed = await window.solana.signTransaction(transaction);
+                const signature = await connection.sendRawTransaction(signed.serialize());
+                await connection.confirmTransaction(signature);
+
+                totalContributed += solAmount;
+                localStorage.setItem("totalContributed", totalContributed);
+                document.getElementById("total-contributed").innerText = totalContributed.toFixed(2);
+                contributors.push(walletAddress);
+                localStorage.setItem("contributors", JSON.stringify(contributors));
+                document.getElementById("waitlist-count").innerText = contributors.length;
+                updateTokenPrice();
+
+                alert("Thank you! Your wallet has been added to the waitlist. You’ll receive 200 GEC when listed.");
+            } catch (err) {
+                console.error("Transaction failed", err);
+                alert("Transaction failed: " + (err.message || err));
+            }
+        }
+
+        function startCountdown() {
+            const listingDate = new Date("2025-05-01T00:00:00Z").getTime();
+            const countdownElement = document.getElementById("countdown");
+
+            function updateCountdown() {
+                const now = Date.now();
+                const timeLeft = listingDate - now;
+                if (timeLeft <= 0) {
+                    canContribute = false;
+                    countdownElement.innerText = "GEC is now live on DEX!";
+                } else {
+                    const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+                    const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                    countdownElement.innerText = `Launch in: ${days}d ${hours}h ${minutes}m`;
+                }
+            }
+
+            updateCountdown();
+            setInterval(updateCountdown, 60000);
+        }
+
+        async function updateTokenPrice() {
+            const solPrice = await getSOLPriceUSD();
+            if (solPrice === 0) return;
+            const liquidityUSD = totalContributed * solPrice;
+            const totalSupply = 100000000;
+            const price = liquidityUSD / totalSupply;
+            document.getElementById("token-price").innerText = "$" + price.toFixed(8);
+        }
+
+        document.getElementById("wallet-button").addEventListener("click", connectWallet);
+        document.getElementById("disconnect-button").addEventListener("click", disconnectWallet);
+        document.getElementById("contribute-button").addEventListener("click", contribute);
+        document.getElementById("admin-wallet").addEventListener("click", () => {
+            navigator.clipboard.writeText(adminWallet).then(() => {
+                alert("Admin wallet address copied!");
+            });
+        });
+
+        if (walletAddress) {
+            document.getElementById("wallet-button").style.display = "none";
+            document.getElementById("disconnect-button").style.display = "block";
+            document.getElementById("wallet-address-display").innerText = walletAddress;
+            document.getElementById("contribute-section").style.display = "block";
+        }
+
+        document.getElementById("total-contributed").innerText = totalContributed.toFixed(2);
+        document.getElementById("waitlist-count").innerText = contributors.length;
+        startCountdown();
+        updateTokenPrice();
+    </script>
+</body>
+</html>
